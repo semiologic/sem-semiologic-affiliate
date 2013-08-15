@@ -34,6 +34,13 @@ Alternatively, email sales at semiologic dot com.
 
 == Change Log ==
 
+= 2.2 =
+
+- Fixed issue with parsing of links with non-standard (class, href, rel, target) attributes included in the <a> tag.  This caused twitter widgets to break
+- Fixed issue with links contained onclick attributes with embedded javascript code.  WordPress' threaded comments does this
+- WP 3.6 compat
+- PHP 5.4 compat
+
 = 2.1.1 =
 
 - WP 3.5 compat

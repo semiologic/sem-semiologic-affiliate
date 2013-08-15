@@ -6,7 +6,14 @@
  **/
 
 class semiologic_affiliate_admin {
-	/**
+    /**
+     * semiologic_affiliate_admin()
+     */
+    function semiologic_affiliate_admin() {
+        add_action('settings_page_semiologic_affiliate', array($this, 'save_options'), 0);
+    }
+
+    /**
 	 * save_options()
 	 *
 	 * @return void
@@ -46,7 +53,7 @@ class semiologic_affiliate_admin {
 	 * @return void
 	 **/
 
-	function edit_options() {
+	static function edit_options() {
 		if ( function_exists('is_super_admin') && !is_super_admin() )
 			return;
 		
@@ -95,5 +102,6 @@ class semiologic_affiliate_admin {
 	} # edit_options()
 } # semiologic_affiliate_admin
 
-add_action('settings_page_semiologic_affiliate', array('semiologic_affiliate_admin', 'save_options'), 0);
+$semiologic_affiliate_admin = new semiologic_affiliate_admin();
+
 ?>

@@ -3,7 +3,7 @@
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
 Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.1.1
+Version: 2.2
 Author: Denis de Bernardy & Mike Koepke
 Author URI: http://www.getsemiologic.com
 Text Domain: sem-semiologic-affiliate
@@ -33,13 +33,30 @@ if ( !defined('semiologic_affiliate_debug') )
  **/
 
 class semiologic_affiliate {
-	/**
+    /**
+     * semiologic_affiliate()
+     */
+    function semiologic_affiliate() {
+        add_action('admin_menu', array($this, 'admin_menu'));
+
+        if ( !is_admin() && semiologic_affiliate::get_campaign() ) {
+
+        	if ( !semiologic_affiliate_debug ) {
+        		add_filter('ob_filter_anchor', array($this, 'filter'));
+        	} else {
+        		add_filter('filter_anchor', array($this, 'filter'));
+        	}
+        }
+    }
+
+
+    /**
 	 * admin_menu()
 	 *
 	 * @return void
 	 **/
 
-	function admin_menu() {
+	static function admin_menu() {
 		if ( function_exists('is_super_admin') && !is_super_admin() )
 			return;
 		
@@ -118,17 +135,10 @@ function semiologic_affiliate_admin() {
 
 add_action('load-settings_page_semiologic_affiliate', 'semiologic_affiliate_admin');
 
-
-add_action('admin_menu', array('semiologic_affiliate', 'admin_menu'));
-
 if ( !is_admin() && semiologic_affiliate::get_campaign() ) {
 	if ( !class_exists('anchor_utils') )
 		include dirname(__FILE__) . '/anchor-utils/anchor-utils.php';
-	
-	if ( !semiologic_affiliate_debug ) {
-		add_filter('ob_filter_anchor', array('semiologic_affiliate', 'filter'));
-	} else {
-		add_filter('filter_anchor', array('semiologic_affiliate', 'filter'));
-	}
 }
+
+$semiologic_affiliate = new semiologic_affiliate();
 ?>
