@@ -3,20 +3,19 @@
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
 Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.2
+Version: 2.2.1
 Author: Denis de Bernardy & Mike Koepke
 Author URI: http://www.getsemiologic.com
 Text Domain: sem-semiologic-affiliate
 Domain Path: /lang
+License: Dual licensed under the MIT and GPLv2 licenses
 */
 
 /*
 Terms of use
 ------------
 
-This software is copyright Mesoconcepts (http://www.mesoconcepts.com), and is distributed under the terms of the GPL license, v.2.
-
-http://www.opensource.org/licenses/gpl-2.0.php
+This software is copyright Denis de Bernardy & Mike Koepke, and is distributed under the terms of the MIT and GPLv2 licenses.
 **/
 
 
@@ -36,10 +35,12 @@ class semiologic_affiliate {
     /**
      * semiologic_affiliate()
      */
-    function semiologic_affiliate() {
+	public function __construct() {
         add_action('admin_menu', array($this, 'admin_menu'));
 
         if ( !is_admin() && semiologic_affiliate::get_campaign() ) {
+	        if ( !class_exists('anchor_utils') )
+	     				include dirname(__FILE__) . '/anchor-utils/anchor-utils.php';
 
         	if ( !semiologic_affiliate_debug ) {
         		add_filter('ob_filter_anchor', array($this, 'filter'));
@@ -135,10 +136,4 @@ function semiologic_affiliate_admin() {
 
 add_action('load-settings_page_semiologic_affiliate', 'semiologic_affiliate_admin');
 
-if ( !is_admin() && semiologic_affiliate::get_campaign() ) {
-	if ( !class_exists('anchor_utils') )
-		include dirname(__FILE__) . '/anchor-utils/anchor-utils.php';
-}
-
 $semiologic_affiliate = new semiologic_affiliate();
-?>

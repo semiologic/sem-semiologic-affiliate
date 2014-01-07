@@ -9,7 +9,7 @@ class semiologic_affiliate_admin {
     /**
      * semiologic_affiliate_admin()
      */
-    function semiologic_affiliate_admin() {
+	public function __construct() {
         add_action('settings_page_semiologic_affiliate', array($this, 'save_options'), 0);
     }
 
@@ -63,8 +63,6 @@ class semiologic_affiliate_admin {
 		
 		wp_nonce_field('semiologic_affiliate');
 		
-		screen_icon();
-		
 		echo '<h2>' . __('Semiologic Affiliate Settings', 'sem-semiologic-affiliate') . '</h2>' . "\n";
 		
 		$aff_id = semiologic_affiliate::get_campaign();
@@ -103,5 +101,3 @@ class semiologic_affiliate_admin {
 } # semiologic_affiliate_admin
 
 $semiologic_affiliate_admin = new semiologic_affiliate_admin();
-
-?>
