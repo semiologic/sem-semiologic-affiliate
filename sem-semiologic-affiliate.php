@@ -3,7 +3,7 @@
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
 Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.2.1
+Version: 2.3 dev
 Author: Denis de Bernardy & Mike Koepke
 Author URI: http://www.getsemiologic.com
 Text Domain: sem-semiologic-affiliate
@@ -19,8 +19,6 @@ This software is copyright Denis de Bernardy & Mike Koepke, and is distributed u
 **/
 
 
-load_plugin_textdomain('sem-semiologic-affiliate', false, dirname(plugin_basename(__FILE__)) . '/lang');
-
 if ( !defined('semiologic_affiliate_debug') )
 	define('semiologic_affiliate_debug', false);
 
@@ -32,31 +30,115 @@ if ( !defined('semiologic_affiliate_debug') )
  **/
 
 class semiologic_affiliate {
-    /**
-     * semiologic_affiliate()
-     */
+	/**
+	 * Plugin instance.
+	 *
+	 * @see get_instance()
+	 * @type object
+	 */
+	protected static $instance = NULL;
+
+	/**
+	 * URL to this plugin's directory.
+	 *
+	 * @type string
+	 */
+	public $plugin_url = '';
+
+	/**
+	 * Path to this plugin's directory.
+	 *
+	 * @type string
+	 */
+	public $plugin_path = '';
+
+	/**
+	 * Access this plugin’s working instance
+	 *
+	 * @wp-hook plugins_loaded
+	 * @return  object of this class
+	 */
+	public static function get_instance()
+	{
+		NULL === self::$instance and self::$instance = new self;
+
+		return self::$instance;
+	}
+
+
+	/**
+	 * Loads translation file.
+	 *
+	 * Accessible to other classes to load different language files (admin and
+	 * front-end for example).
+	 *
+	 * @wp-hook init
+	 * @param   string $domain
+	 * @return  void
+	 */
+	public function load_language( $domain )
+	{
+		load_plugin_textdomain(
+			$domain,
+			FALSE,
+			$this->plugin_path . 'lang'
+		);
+	}
+
+	/**
+	 * Constructor.
+	 *
+	 *
+	 */
+
 	public function __construct() {
-        add_action('admin_menu', array($this, 'admin_menu'));
+		$this->plugin_url    = plugins_url( '/', __FILE__ );
+		$this->plugin_path   = plugin_dir_path( __FILE__ );
+		$this->load_language( 'sem-semiologic-affiliate' );
 
-        if ( !is_admin() && semiologic_affiliate::get_campaign() ) {
-	        if ( !class_exists('anchor_utils') )
-	     				include dirname(__FILE__) . '/anchor-utils/anchor-utils.php';
-
-        	if ( !semiologic_affiliate_debug ) {
-        		add_filter('ob_filter_anchor', array($this, 'filter'));
-        	} else {
-        		add_filter('filter_anchor', array($this, 'filter'));
-        	}
-        }
+		add_action( 'plugins_loaded', array ( $this, 'init' ) );
     }
 
+
+	/**
+	 * init()
+	 *
+	 * @return void
+	 **/
+
+	function init() {
+			// more stuff: register actions and filters
+		if ( !is_admin() && semiologic_affiliate::get_campaign() ) {
+			if ( !class_exists('anchor_utils') )
+				include $this->plugin_path . '/anchor-utils/anchor-utils.php';
+
+			if ( !semiologic_affiliate_debug ) {
+			    add_filter('ob_filter_anchor', array($this, 'filter'));
+			} else {
+			    add_filter('filter_anchor', array($this, 'filter'));
+			}
+		}
+
+		if ( is_admin() ) {
+			add_action('admin_menu', array($this, 'admin_menu'));
+			add_action('load-settings_page_semiologic_affiliate', array($this, 'semiologic_affiliate_admin'));
+		}
+	}
+
+	/**
+	* semiologic_affiliate_admin()
+	*
+	* @return void
+	**/
+	function semiologic_affiliate_admin() {
+		include $this->plugin_path . '/sem-semiologic-affiliate-admin.php';
+	}
 
     /**
 	 * admin_menu()
 	 *
 	 * @return void
 	 **/
-
 	static function admin_menu() {
 		if ( function_exists('is_super_admin') && !is_super_admin() )
 			return;
@@ -129,11 +211,4 @@ class semiologic_affiliate {
 	} # filter()
 } # semiologic_affiliate
 
-
-function semiologic_affiliate_admin() {
-	include dirname(__FILE__) . '/sem-semiologic-affiliate-admin.php';
-}
-
-add_action('load-settings_page_semiologic_affiliate', 'semiologic_affiliate_admin');
-
-$semiologic_affiliate = new semiologic_affiliate();
+$semiologic_affiliate = semiologic_affiliate::get_instance();

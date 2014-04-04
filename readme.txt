@@ -34,6 +34,10 @@ Alternatively, email sales at semiologic dot com.
 
 == Change Log ==
 
+= 2.3 =
+
+- Code refactoring
+
 = 2.2.1 =
 
 - WP 3.8 compat
