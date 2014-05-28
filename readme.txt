@@ -34,6 +34,11 @@ Alternatively, email sales at semiologic dot com.
 
 == Change Log ==
 
+= 2.4 =
+
+- Use wp_print_footer_scripts hook instead of wp_footer as some themes fail to call wp_footer();
+- Use own custom version of the anchor_utils class
+
 = 2.3 =
 
 - Code refactoring
