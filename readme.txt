@@ -34,6 +34,10 @@ Alternatively, email sales at semiologic dot com.
 
 == Change Log ==
 
+= 2.4.1 =
+
+- Fix svn issue
+
 = 2.4 =
 
 - Use wp_print_footer_scripts hook instead of wp_footer as some themes fail to call wp_footer();
