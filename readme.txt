@@ -34,6 +34,10 @@ Alternatively, email sales at semiologic dot com.
 
 == Change Log ==
 
+= 2.4.2 =
+
+- Fix compatibility with Yoast WP SEO plugin when Force Title Rewrite option is on.
+
 = 2.4.1 =
 
 - Fix svn issue

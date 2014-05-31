@@ -27,14 +27,14 @@ class sem_affiliate_anchor_utils {
 	    $this->semiologic_affiliate = $semiologic_affiliate;
 
 	    if ( $apply_globally ) {
-		    add_action('wp_head', array($this, 'ob_start'), 100000);
+		    add_action('template_redirect', array($this, 'ob_start'), 100);
 	    }
 	    else {
-	        add_filter('the_content', array($this, 'filter'), 100000);
-	        add_filter('the_excerpt', array($this, 'filter'), 100000);
-	        add_filter('comment_text', array($this, 'filter'), 100000);
+	        add_filter('the_content', array($this, 'filter'), 1000000);
+	        add_filter('the_excerpt', array($this, 'filter'), 1000000);
+	        add_filter('comment_text', array($this, 'filter'), 1000000);
 		    if ( $inc_text_widgets )
-		        add_filter('widget_text', array($this, 'filter'), 100000);
+		        add_filter('widget_text', array($this, 'filter'), 1000000);
 	    }
     } #sem_affiliate_anchor_utils
 
@@ -47,7 +47,7 @@ class sem_affiliate_anchor_utils {
 
 	function ob_start() {
 		ob_start(array($this, 'ob_filter'));
-		add_action('wp_print_footer_scripts', array($this, 'ob_flush'), 100000);
+		add_action('wp_footer', array($this, 'ob_flush'), 1000000);
 	} # ob_start()
 
 	/**
