@@ -34,6 +34,10 @@ Alternatively, email sales at semiologic dot com.
 
 == Change Log ==
 
+= 2.6 =
+
+- Fix some performance issues in the link parsing.   New algorithm used.
+
 = 2.5 =
 
 - WP 4.0 compat

@@ -3,7 +3,7 @@
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
 Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.5
+Version: 2.6
 Author: Denis de Bernardy & Mike Koepke
 Author URI: http://www.getsemiologic.com
 Text Domain: sem-semiologic-affiliate
@@ -115,13 +115,7 @@ class semiologic_affiliate {
 			if ( !class_exists('sem_affiliate_anchor_utils') )
 				include $this->plugin_path . '/sem-affiliate-anchor-utils.php';
 
-/*			if ( !semiologic_affiliate_debug ) {
-			    add_filter('ob_filter_anchor', array($this, 'filter'));
-			} else {
-			    add_filter('filter_anchor', array($this, 'filter'));
-			}
-*/
-			$this->anchor_utils = new sem_affiliate_anchor_utils( $this, !semiologic_affiliate_debug, true );
+			$this->anchor_utils = new sem_affiliate_anchor_utils( $this );
 		}
 
 		if ( is_admin() ) {
@@ -156,56 +150,288 @@ class semiologic_affiliate {
 			array('semiologic_affiliate_admin', 'edit_options')
 			);
 	} # admin_menu()
-	
+
 	
 	/**
-	 * get_campaign()
+	 * process_content()
 	 *
-	 * @return string $aff_id
+	 * @param string $text
+	 * @return string $text
 	 **/
 
-	static function get_campaign() {
-		$o = get_site_option('sem_campaign_key');
-		
-		if ( $o === false )
-			$o = semiologic_affiliate::init_campaign();
-		
-		return $o;	
-	} # get_campaign()
-	
-	
+	function process_content($text) {
+		global $escape_anchor_filter;
+		$escape_anchor_filter = array();
+
+		$text = $this->escape($text);
+
+		// find all occurrences of anchors and fill matches with links
+		preg_match_all("/
+					<\s*a\s+
+					([^<>]+)
+					>
+					(.*?)
+					<\s*\/\s*a\s*>
+					/isx", $text, $matches, PREG_SET_ORDER);
+
+		$raw_links = array();
+		$processed_links = array();
+
+		foreach ($matches as $match)
+		{
+			$updated_link = $this->process_link($match);
+			if ( $updated_link ) {
+				$raw_links[]     = $match[0];
+				$processed_links[] = $updated_link;
+			}
+		}
+
+		if ( !empty($raw_links) && !empty($processed_links) )
+			$text = str_replace($raw_links, $processed_links, $text);
+
+		$text = $this->unescape($text);
+
+		return $text;
+	} # process_content()
+
+
 	/**
-	 * init_campaign()
+	 * escape()
 	 *
-	 * @return string $aff_id
+	 * @param string $text
+	 * @return string $text
 	 **/
 
-	function init_campaign() {
-		$o = get_option('sem_semiologic_affiliate_params');
-		
-		if ( $o !== false ) {
-			$o = isset($options['aff_id']) ? trim($options['aff_id']) : '';
-			delete_option('sem_semiologic_affiliate_params');
+	function escape($text) {
+		global $escape_anchor_filter;
+
+		if ( !isset($escape_anchor_filter) )
+			$escape_anchor_filter = array();
+
+		foreach ( array(
+			'head' => "/
+				.*?
+				<\s*\/\s*head\s*>
+				/isx",
+			'blocks' => "/
+				<\s*(script|style|object|textarea)(?:\s.*?)?>
+				.*?
+				<\s*\/\s*\\1\s*>
+				/isx",
+			) as $regex ) {
+			$text = preg_replace_callback($regex, array($this, 'escape_callback'), $text);
 		}
-		
-		if ( !$o ) {
-			$o = get_option('sem_campaign_key') ? get_option('sem_campaign_key') : '';
-		}
-		
-		update_site_option('sem_campaign_key', $o);
-		
-		return $o;
-	} # init_campaign()
-	
-	
+
+		return $text;
+	} # escape()
+
+
 	/**
-	 * filter()
+	 * escape_callback()
 	 *
-	 * @param array $anchor
+	 * @param array $match
+	 * @return string $text
+	 **/
+
+	function escape_callback($match) {
+		global $escape_anchor_filter;
+
+		$tag_id = "----escape_auto_thickbox:" . md5($match[0]) . "----";
+		$escape_anchor_filter[$tag_id] = $match[0];
+
+		return $tag_id;
+	} # escape_callback()
+
+
+	/**
+	 * unescape()
+	 *
+	 * @param string $text
+	 * @return string $text
+	 **/
+
+	function unescape($text) {
+		global $escape_anchor_filter;
+
+		if ( !$escape_anchor_filter )
+			return $text;
+
+		$unescape = array_reverse($escape_anchor_filter);
+
+		return str_replace(array_keys($unescape), array_values($unescape), $text);
+	} # unescape()
+
+
+	/**
+	 * filter_callback()
+	 *
+	 * @param array $match
+	 * @return string $str
+	 **/
+
+	function process_link($match) {
+		# skip empty anchors
+		if ( !trim($match[2]) )
+			return $match[0];
+
+		# parse anchor
+		$anchor = $this->parse_anchor($match);
+
+		if ( !$anchor )
+			return $match[0];
+
+		# filter anchor
+		$anchor = $this->filter_anchor( $anchor );
+
+		if ( $anchor )
+			$anchor = $this->build_anchor($match[0], $anchor);
+
+		return $anchor;
+	} # process_link()
+
+
+	/**
+	 * parse_anchor()
+	 *
+	 * @param array $match
 	 * @return array $anchor
 	 **/
 
-	function filter($anchor) {
+	function parse_anchor($match) {
+		$anchor = array();
+		$anchor['attr'] = $this->parseAttributes( $match[1] );
+
+		if ( !is_array($anchor['attr']) || empty($anchor['attr']['href']) # parser error or no link
+			|| trim($anchor['attr']['href']) != esc_url($anchor['attr']['href'], null, 'db') ) # likely a script
+			return false;
+
+		foreach ( array('class', 'rel') as $attr ) {
+			if ( !isset($anchor['attr'][$attr]) ) {
+				$anchor['attr'][$attr] = array();
+			} else {
+				$anchor['attr'][$attr] = explode(' ', $anchor['attr'][$attr]);
+				$anchor['attr'][$attr] = array_map('trim', $anchor['attr'][$attr]);
+			}
+		}
+
+		$anchor['body'] = $match[2];
+
+		$anchor['attr']['href'] = @html_entity_decode($anchor['attr']['href'], ENT_COMPAT, get_option('blog_charset'));
+
+		return $anchor;
+	} # parse_anchor()
+
+	/**
+	 * Parse an attributes string into an array. If the string starts with a tag,
+	 * then the attributes on the first tag are parsed. This parses via a manual
+	 * loop and is designed to be safer than using DOMDocument.
+	 *
+	 * @param    string|*   $attrs
+	 * @return   array
+	 *
+	 * @example  parse_attrs( 'src="example.jpg" alt="example"' )
+	 * @example  parse_attrs( '<img src="example.jpg" alt="example">' )
+	 * @example  parse_attrs( '<a href="example"></a>' )
+	 * @example  parse_attrs( '<a href="example">' )
+	 */
+	function parseAttributes($text) {
+	    $attributes = array();
+	    $pattern = '#(?(DEFINE)
+	            (?<name>[a-zA-Z][a-zA-Z0-9-:]*)
+	            (?<value_double>"[^"]+")
+	            (?<value_single>\'[^\']+\')
+	            (?<value_none>[^\s>]+)
+	            (?<value>((?&value_double)|(?&value_single)|(?&value_none)))
+	        )
+	        (?<n>(?&name))(=(?<v>(?&value)))?#xs';
+
+	    if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER)) {
+	        foreach ($matches as $match) {
+	            $attributes[$match['n']] = isset($match['v'])
+	                ? trim($match['v'], '\'"')
+	                : null;
+	        }
+	    }
+
+	    return $attributes;
+	}
+
+	/**
+	 * build_anchor()
+	 *
+	 * @param $link
+	 * @param array $anchor
+	 * @return string $anchor
+	 */
+
+	function build_anchor($link, $anchor) {
+
+		$attrs = array( 'href' );
+
+		foreach ( $attrs as $attr ) {
+			if ( isset($anchor['attr'][$attr]) ) {
+				$new_attr_value = null;
+				$values = $anchor['attr'][$attr];
+				if ( is_array($values) ) {
+					$values = array_unique($values);
+					if ( $values )
+						$new_attr_value = implode(' ',  $values );
+				} else {
+					$new_attr_value = $values;
+				}
+
+				if ( $new_attr_value )
+					$link = $this->update_attribute($link, $attr, $new_attr_value);
+			}
+		}
+
+		return $link;
+	} # build_anchor()
+
+
+	/**
+	 * Updates attribute of an HTML tag.
+	 *
+	 * @param $html
+	 * @param $attr_name
+	 * @param $new_attr_value
+	 * @return string
+	 */
+	function update_attribute($html, $attr_name, $new_attr_value) {
+
+		$attr_value     = false;
+		$quote          = false; // quotes to wrap attribute values
+
+		if (preg_match('/\s' . $attr_name . '="([^"]*)"/iu', $html, $matches)
+			|| preg_match('/\s' . $attr_name . "='([^']*)'/iu", $html, $matches)
+		) {
+			// two possible ways to get existing attributes
+			$attr_value = $matches[1];
+
+			$quote = false !== stripos($html, $attr_name . "='") ? "'" : '"';
+		}
+
+		if ($attr_value)
+		{
+			//replace current attribute
+			return str_ireplace("$attr_name=" . $quote . "$attr_value" . $quote,
+				$attr_name . '="' . esc_attr($new_attr_value) . '"', $html);
+		}
+		else {
+			// attribute does not currently exist, add it
+			return str_ireplace('>', " $attr_name=\"" . esc_attr($new_attr_value) . '">', $html);
+		}
+	} # update_attribute()
+
+
+	/**
+	 * filter_anchor()
+	 *
+	 * @param $anchor
+	 * @return string
+	 */
+
+	function filter_anchor($anchor) {
 		if ( !preg_match("/^https?:\/\/(?:www\.)?(?:get)?semiologic\.com\b/", $anchor['attr']['href']) )
 			return $anchor;
 		
@@ -214,6 +440,46 @@ class semiologic_affiliate {
 		
 		return $anchor;
 	} # filter()
+
+
+	/**
+	 * get_campaign()
+	 *
+	 * @return string $aff_id
+	 **/
+
+	static function get_campaign() {
+		$o = get_site_option('sem_campaign_key');
+
+		if ( $o === false )
+			$o = semiologic_affiliate::init_campaign();
+
+		return $o;
+	} # get_campaign()
+
+
+	/**
+	 * init_campaign()
+	 *
+	 * @return string $aff_id
+	 **/
+
+	function init_campaign() {
+		$o = get_option('sem_semiologic_affiliate_params');
+
+		if ( $o !== false ) {
+			$o = isset($options['aff_id']) ? trim($options['aff_id']) : '';
+			delete_option('sem_semiologic_affiliate_params');
+		}
+
+		if ( !$o ) {
+			$o = get_option('sem_campaign_key') ? get_option('sem_campaign_key') : '';
+		}
+
+		update_site_option('sem_campaign_key', $o);
+
+		return $o;
+	} # init_campaign()
 } # semiologic_affiliate
 
 $semiologic_affiliate = semiologic_affiliate::get_instance();
