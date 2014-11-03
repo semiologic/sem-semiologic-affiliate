@@ -3,7 +3,7 @@
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
 Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.6
+Version: 2.6.1
 Author: Denis de Bernardy & Mike Koepke
 Author URI: http://www.getsemiologic.com
 Text Domain: sem-semiologic-affiliate
@@ -334,26 +334,89 @@ class semiologic_affiliate {
 	 * @example  parse_attrs( '<a href="example"></a>' )
 	 * @example  parse_attrs( '<a href="example">' )
 	 */
-	function parseAttributes($text) {
-	    $attributes = array();
-	    $pattern = '#(?(DEFINE)
-	            (?<name>[a-zA-Z][a-zA-Z0-9-:]*)
-	            (?<value_double>"[^"]+")
-	            (?<value_single>\'[^\']+\')
-	            (?<value_none>[^\s>]+)
-	            (?<value>((?&value_double)|(?&value_single)|(?&value_none)))
-	        )
-	        (?<n>(?&name))(=(?<v>(?&value)))?#xs';
+	function parse_attrs($attrs) {
 
-	    if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER)) {
-	        foreach ($matches as $match) {
-	            $attributes[$match['n']] = isset($match['v'])
-	                ? trim($match['v'], '\'"')
-	                : null;
+	    if ( !is_scalar($attrs) )
+	        return (array) $attrs;
+
+	    $attrs = str_split( trim($attrs) );
+
+	    if ( '<' === $attrs[0] ) # looks like a tag so strip the tagname
+	        while ( $attrs && ! ctype_space($attrs[0]) && $attrs[0] !== '>' )
+	            array_shift($attrs);
+
+	    $arr = array(); # output
+	    $name = '';     # for the current attr being parsed
+	    $value = '';    # for the current attr being parsed
+	    $mode = 0;      # whether current char is part of the name (-), the value (+), or neither (0)
+	    $stop = false;  # delimiter for the current $value being parsed
+	    $space = ' ';   # a single space
+		$paren = 0;     # in parenthesis for js attrs
+
+	    foreach ( $attrs as $j => $curr ) {
+
+	        if ( $mode < 0 ) {# name
+	            if ( '=' === $curr ) {
+	                $mode = 1;
+	                $stop = false;
+	            } elseif ( '>' === $curr ) {
+	                '' === $name or $arr[ $name ] = $value;
+	                break;
+	            } elseif ( !ctype_space($curr) ) {
+	                if ( ctype_space( $attrs[ $j - 1 ] ) ) { # previous char
+	                    '' === $name or $arr[ $name ] = '';   # previous name
+	                    $name = $curr;                        # initiate new
+	                } else {
+	                    $name .= $curr;
+	                }
+	            }
+	        } elseif ( $mode > 0 ) {# value
+		        if ( $paren ) {
+			        $value .= $curr;
+                    if ( $curr === "(")
+                        $paren += 1;
+                    elseif ( $curr === ")")
+                        $paren -= 1;
+		        }
+		        else {
+		            if ( $stop === false ) {
+		                if ( !ctype_space($curr) ) {
+		                    if ( '"' === $curr || "'" === $curr ) {
+		                        $value = '';
+		                        $stop = $curr;
+		                    } else {
+		                        $value = $curr;
+		                        $stop = $space;
+		                    }
+		                }
+		            } elseif ( $stop === $space ? ctype_space($curr) : $curr === $stop ) {
+		                $arr[ $name ] = $value;
+		                $mode = 0;
+		                $name = $value = '';
+		            } else {
+		                $value .= $curr;
+			            if ( $curr === "(")
+	                        $paren += 1;
+	                    elseif ( $curr === ")")
+	                        $paren -= 1;
+		            }
+		        }
+	        } else {# neither
+
+	            if ( '>' === $curr )
+	                break;
+	            if ( !ctype_space( $curr ) ) {
+	                # initiate
+	                $name = $curr;
+	                $mode = -1;
+	            }
 	        }
 	    }
 
-	    return $attributes;
+	    # incl the final pair if it was quoteless
+	    '' === $name or $arr[ $name ] = $value;
+
+	    return $arr;
 	}
 
 	/**
@@ -364,28 +427,25 @@ class semiologic_affiliate {
 	 * @return string $anchor
 	 */
 
-	function build_anchor($link, $anchor) {
+	function build_anchor($anchor) {
+		$anchor['attr']['href'] = esc_url($anchor['attr']['href']);
 
-		$attrs = array( 'href' );
-
-		foreach ( $attrs as $attr ) {
-			if ( isset($anchor['attr'][$attr]) ) {
-				$new_attr_value = null;
-				$values = $anchor['attr'][$attr];
-				if ( is_array($values) ) {
-					$values = array_unique($values);
-					if ( $values )
-						$new_attr_value = implode(' ',  $values );
-				} else {
-					$new_attr_value = $values;
-				}
-
-				if ( $new_attr_value )
-					$link = $this->update_attribute($link, $attr, $new_attr_value);
+		$str = '<a';
+		foreach ( $anchor['attr'] as $k => $v ) {
+			if ( is_array($v) ) {
+				$v = array_unique($v);
+				if ( $v )
+					$str .= ' ' . $k . '="' . implode(' ', $v) . '"';
+			} else {
+               if ($k)
+				    $str .= ' ' . $k . '="' . $v . '"';
+               else
+                    $str .= ' ' . $v;
 			}
 		}
+		$str .= '>' . $anchor['body'] . '</a>';
 
-		return $link;
+		return $str;
 	} # build_anchor()
 
 

@@ -34,6 +34,10 @@ Alternatively, email sales at semiologic dot com.
 
 == Change Log ==
 
+= 2.6.1 =
+
+- Just a tweak for attribute parsing to sync with similiar code
+
 = 2.6 =
 
 - Fix some performance issues in the link parsing.   New algorithm used.
