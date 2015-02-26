@@ -3,7 +3,7 @@
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
 Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.6.1
+Version: 2.7
 Author: Denis de Bernardy & Mike Koepke
 Author URI: http://www.getsemiologic.com
 Text Domain: sem-semiologic-affiliate
@@ -156,14 +156,22 @@ class semiologic_affiliate {
 	 * process_content()
 	 *
 	 * @param string $text
+	 * @param string $context
 	 * @return string $text
 	 **/
 
-	function process_content($text) {
-		global $escape_anchor_filter;
-		$escape_anchor_filter = array();
+	function process_content($text, $context = "global") {
+		// short circuit if there's no anchors at all in the text
+		if ( false === stripos($text, '<a ') )
+			return($text);
 
-		$text = $this->escape($text);
+		$escape_needed = array( 'global', 'content', 'widgets' );
+		if ( in_array($context, $escape_needed ) ) {
+			global $escape_anchor_filter;
+			$escape_anchor_filter = array();
+
+			$text = $this->escape($text, $context);
+		}
 
 		// find all occurrences of anchors and fill matches with links
 		preg_match_all("/
@@ -189,36 +197,41 @@ class semiologic_affiliate {
 		if ( !empty($raw_links) && !empty($processed_links) )
 			$text = str_replace($raw_links, $processed_links, $text);
 
-		$text = $this->unescape($text);
+		if ( in_array($context, $escape_needed ) ) {
+			$text = $this->unescape($text);
+		}
 
 		return $text;
 	} # process_content()
-
 
 	/**
 	 * escape()
 	 *
 	 * @param string $text
+	 * @param string $context
 	 * @return string $text
 	 **/
-
-	function escape($text) {
+	function escape($text, $context) {
 		global $escape_anchor_filter;
 
 		if ( !isset($escape_anchor_filter) )
 			$escape_anchor_filter = array();
 
-		foreach ( array(
-			'head' => "/
-				.*?
-				<\s*\/\s*head\s*>
-				/isx",
-			'blocks' => "/
-				<\s*(script|style|object|textarea)(?:\s.*?)?>
-				.*?
-				<\s*\/\s*\\1\s*>
-				/isx",
-			) as $regex ) {
+		$exclusions = array();
+
+		if ( $context == 'global' )
+			$exclusions['head'] = "/
+							.*?
+							<\s*\/\s*head\s*>
+							/isx";
+
+		$exclusions['blocks'] = "/
+						<\s*(script|style|object|textarea)(?:\s.*?)?>
+						.*?
+						<\s*\/\s*\\1\s*>
+						/isx";
+
+		foreach ( $exclusions as $regex ) {
 			$text = preg_replace_callback($regex, array($this, 'escape_callback'), $text);
 		}
 
@@ -270,15 +283,11 @@ class semiologic_affiliate {
 	 **/
 
 	function process_link($match) {
-		# skip empty anchors
-		if ( !trim($match[2]) )
-			return $match[0];
-
 		# parse anchor
 		$anchor = $this->parse_anchor($match);
 
 		if ( !$anchor )
-			return $match[0];
+			return false;
 
 		# filter anchor
 		$anchor = $this->filter_anchor( $anchor );
@@ -322,104 +331,6 @@ class semiologic_affiliate {
 	} # parse_anchor()
 
 	/**
-	 * Parse an attributes string into an array. If the string starts with a tag,
-	 * then the attributes on the first tag are parsed. This parses via a manual
-	 * loop and is designed to be safer than using DOMDocument.
-	 *
-	 * @param    string|*   $attrs
-	 * @return   array
-	 *
-	 * @example  parse_attrs( 'src="example.jpg" alt="example"' )
-	 * @example  parse_attrs( '<img src="example.jpg" alt="example">' )
-	 * @example  parse_attrs( '<a href="example"></a>' )
-	 * @example  parse_attrs( '<a href="example">' )
-	 */
-	function parse_attrs($attrs) {
-
-	    if ( !is_scalar($attrs) )
-	        return (array) $attrs;
-
-	    $attrs = str_split( trim($attrs) );
-
-	    if ( '<' === $attrs[0] ) # looks like a tag so strip the tagname
-	        while ( $attrs && ! ctype_space($attrs[0]) && $attrs[0] !== '>' )
-	            array_shift($attrs);
-
-	    $arr = array(); # output
-	    $name = '';     # for the current attr being parsed
-	    $value = '';    # for the current attr being parsed
-	    $mode = 0;      # whether current char is part of the name (-), the value (+), or neither (0)
-	    $stop = false;  # delimiter for the current $value being parsed
-	    $space = ' ';   # a single space
-		$paren = 0;     # in parenthesis for js attrs
-
-	    foreach ( $attrs as $j => $curr ) {
-
-	        if ( $mode < 0 ) {# name
-	            if ( '=' === $curr ) {
-	                $mode = 1;
-	                $stop = false;
-	            } elseif ( '>' === $curr ) {
-	                '' === $name or $arr[ $name ] = $value;
-	                break;
-	            } elseif ( !ctype_space($curr) ) {
-	                if ( ctype_space( $attrs[ $j - 1 ] ) ) { # previous char
-	                    '' === $name or $arr[ $name ] = '';   # previous name
-	                    $name = $curr;                        # initiate new
-	                } else {
-	                    $name .= $curr;
-	                }
-	            }
-	        } elseif ( $mode > 0 ) {# value
-		        if ( $paren ) {
-			        $value .= $curr;
-                    if ( $curr === "(")
-                        $paren += 1;
-                    elseif ( $curr === ")")
-                        $paren -= 1;
-		        }
-		        else {
-		            if ( $stop === false ) {
-		                if ( !ctype_space($curr) ) {
-		                    if ( '"' === $curr || "'" === $curr ) {
-		                        $value = '';
-		                        $stop = $curr;
-		                    } else {
-		                        $value = $curr;
-		                        $stop = $space;
-		                    }
-		                }
-		            } elseif ( $stop === $space ? ctype_space($curr) : $curr === $stop ) {
-		                $arr[ $name ] = $value;
-		                $mode = 0;
-		                $name = $value = '';
-		            } else {
-		                $value .= $curr;
-			            if ( $curr === "(")
-	                        $paren += 1;
-	                    elseif ( $curr === ")")
-	                        $paren -= 1;
-		            }
-		        }
-	        } else {# neither
-
-	            if ( '>' === $curr )
-	                break;
-	            if ( !ctype_space( $curr ) ) {
-	                # initiate
-	                $name = $curr;
-	                $mode = -1;
-	            }
-	        }
-	    }
-
-	    # incl the final pair if it was quoteless
-	    '' === $name or $arr[ $name ] = $value;
-
-	    return $arr;
-	}
-
-	/**
 	 * build_anchor()
 	 *
 	 * @param $link
@@ -427,25 +338,28 @@ class semiologic_affiliate {
 	 * @return string $anchor
 	 */
 
-	function build_anchor($anchor) {
-		$anchor['attr']['href'] = esc_url($anchor['attr']['href']);
+	function build_anchor($link, $anchor) {
 
-		$str = '<a';
-		foreach ( $anchor['attr'] as $k => $v ) {
-			if ( is_array($v) ) {
-				$v = array_unique($v);
-				if ( $v )
-					$str .= ' ' . $k . '="' . implode(' ', $v) . '"';
-			} else {
-               if ($k)
-				    $str .= ' ' . $k . '="' . $v . '"';
-               else
-                    $str .= ' ' . $v;
+		$attrs = array( 'href');
+
+		foreach ( $attrs as $attr ) {
+			if ( isset($anchor['attr'][$attr]) ) {
+				$new_attr_value = null;
+				$values = $anchor['attr'][$attr];
+				if ( is_array($values) ) {
+					$values = array_unique($values);
+					if ( $values )
+						$new_attr_value = implode(' ',  $values );
+				} else {
+					$new_attr_value = $values;
+				}
+
+				if ( $new_attr_value )
+					$link = $this->update_attribute($link, $attr, $new_attr_value);
 			}
 		}
-		$str .= '>' . $anchor['body'] . '</a>';
 
-		return $str;
+		return $link;
 	} # build_anchor()
 
 
@@ -462,11 +376,17 @@ class semiologic_affiliate {
 		$attr_value     = false;
 		$quote          = false; // quotes to wrap attribute values
 
-		if (preg_match('/\s' . $attr_name . '="([^"]*)"/iu', $html, $matches)
-			|| preg_match('/\s' . $attr_name . "='([^']*)'/iu", $html, $matches)
+		preg_match('/(<a.*>)/iU', $html, $match);
+
+		$link_str = $match[1];
+		if ($link_str == "")
+			return $html;
+
+		$re = '/' . preg_quote($attr_name) . '=([\'"])?((?(1).+?|[^\s>]+))(?(1)\1)/is';
+		if (preg_match($re, $link_str, $matches)
 		) {
 			// two possible ways to get existing attributes
-			$attr_value = $matches[1];
+			$attr_value = $matches[2];
 
 			$quote = false !== stripos($html, $attr_name . "='") ? "'" : '"';
 		}
@@ -474,15 +394,19 @@ class semiologic_affiliate {
 		if ($attr_value)
 		{
 			//replace current attribute
-			return str_ireplace("$attr_name=" . $quote . "$attr_value" . $quote,
+			$html = str_ireplace("$attr_name=" . $quote . "$attr_value" . $quote,
 				$attr_name . '="' . esc_attr($new_attr_value) . '"', $html);
 		}
 		else {
 			// attribute does not currently exist, add it
-			return str_ireplace('>', " $attr_name=\"" . esc_attr($new_attr_value) . '">', $html);
+			$pos = strpos( $html, '>' );
+			if ($pos !== false) {
+				$html = substr_replace( $html, " $attr_name=\"" . esc_attr($new_attr_value) . '">', $pos, strlen('>') );
+			}
 		}
-	} # update_attribute()
 
+		return $html;
+	} # update_attribute()
 
 	/**
 	 * filter_anchor()
@@ -492,7 +416,11 @@ class semiologic_affiliate {
 	 */
 
 	function filter_anchor($anchor) {
-		if ( !preg_match("/^https?:\/\/(?:www\.)?(?:get)?semiologic\.com\b/", $anchor['attr']['href']) )
+		if ( (strpos($url, 'http://') !== false)
+			&& (strpos($url, 'https://') !== false) )
+			return $anchor;
+
+		if ( !preg_match("/(?:www\.)?(?:get)?semiologic\.com\b/", $anchor['attr']['href']) )
 			return $anchor;
 		
 		if ( strpos($anchor['attr']['href'], '?') === false )
@@ -501,6 +429,27 @@ class semiologic_affiliate {
 		return $anchor;
 	} # filter()
 
+	function parseAttributes($text) {
+	    $attributes = array();
+	    $pattern = '#(?(DEFINE)
+	            (?<name>[a-zA-Z][a-zA-Z0-9-:]*)
+	            (?<value_double>"[^"]+")
+	            (?<value_single>\'[^\']+\')
+	            (?<value_none>[^\s>]+)
+	            (?<value>((?&value_double)|(?&value_single)|(?&value_none)))
+	        )
+	        (?<n>(?&name))(=(?<v>(?&value)))?#xs';
+
+	    if (preg_match_all($pattern, $text, $matches, PREG_SET_ORDER)) {
+	        foreach ($matches as $match) {
+	            $attributes[$match['n']] = isset($match['v'])
+	                ? trim($match['v'], '\'"')
+	                : null;
+	        }
+	    }
+
+	    return $attributes;
+	}
 
 	/**
 	 * get_campaign()

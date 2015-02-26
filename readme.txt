@@ -3,7 +3,7 @@ Contributors: Denis-de-Bernardy, Mike_Koepke
 Donate link: http://www.semiologic.com/partners/
 Tags: affiliate, marketing, internet-marketing, semiologic
 Requires at least: 2.8
-Tested up to: 4.0
+Tested up to: 4.1
 Stable tag: trunk
 
 Automatically adds your affiliate ID to all links to Semiologic.
@@ -33,6 +33,14 @@ Alternatively, email sales at semiologic dot com.
 
 
 == Change Log ==
+
+= 2.7 =
+
+- Updated link parsing logic to improve speed.
+
+= 2.6.2 =
+
+- SVN.. sigh
 
 = 2.6.1 =
 
