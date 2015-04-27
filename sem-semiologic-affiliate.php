@@ -3,7 +3,7 @@
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
 Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.7
+Version: 2.7.1
 Author: Denis de Bernardy & Mike Koepke
 Author URI: http://www.getsemiologic.com
 Text Domain: sem-semiologic-affiliate
@@ -416,8 +416,8 @@ class semiologic_affiliate {
 	 */
 
 	function filter_anchor($anchor) {
-		if ( (strpos($url, 'http://') !== false)
-			&& (strpos($url, 'https://') !== false) )
+		if ( (strpos($anchor['attr']['href'], 'http://') !== false)
+			&& (strpos($anchor['attr']['href'], 'https://') !== false) )
 			return $anchor;
 
 		if ( !preg_match("/(?:www\.)?(?:get)?semiologic\.com\b/", $anchor['attr']['href']) )
