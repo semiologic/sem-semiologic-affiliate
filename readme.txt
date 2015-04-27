@@ -36,7 +36,7 @@ Alternatively, email sales at semiologic dot com.
 
 = 2.7.1 =
 
-- Fix error from in url variable introduced in 2.7.1
+- Fix error from in url variable introduced in 2.7
 
 = 2.7 =
 
