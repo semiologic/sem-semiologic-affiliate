@@ -2,10 +2,10 @@
 /*
 Plugin Name: Semiologic Affiliate
 Plugin URI: http://www.semiologic.com/software/sem-affiliate/
-Description: Automatically adds your affiliate ID to all links to Semiologic.
-Version: 2.7.1
+Description: RETIRED - Automatically adds your affiliate ID to all links to Semiologic.
+Version: 2.7.2
 Author: Denis de Bernardy & Mike Koepke
-Author URI: http://www.getsemiologic.com
+Author URI: https://www.semiologic.com
 Text Domain: sem-semiologic-affiliate
 Domain Path: /lang
 License: Dual licensed under the MIT and GPLv2 licenses
@@ -17,6 +17,33 @@ Terms of use
 
 This software is copyright Denis de Bernardy & Mike Koepke, and is distributed under the terms of the MIT and GPLv2 licenses.
 **/
+
+/*
+ * This plugin has been retired.  No further development will occur on it.
+ * */
+
+// Disable the plugin
+
+$active_plugins = get_option('active_plugins');
+
+if ( !is_array($active_plugins) )
+{
+	$active_plugins = array();
+}
+
+foreach ( (array) $active_plugins as $key => $plugin )
+{
+	if ( $plugin == 'sem-semiologic-affiliate/sem-semiologic-affiliate.php' )
+	{
+		unset($active_plugins[$key]);
+		break;
+	}
+}
+
+sort($active_plugins);
+
+update_option('active_plugins', $active_plugins);
+
 
 
 if ( !defined('semiologic_affiliate_debug') )
