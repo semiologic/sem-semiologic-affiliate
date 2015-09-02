@@ -6,12 +6,12 @@ Requires at least: 2.8
 Tested up to: 4.2
 Stable tag: trunk
 
-> *This plugin has been retired.  No further development will occur on it.*
-
 Automatically adds your affiliate ID to all links to Semiologic.
 
 
 == Description ==
+
+> *This plugin has been retired.  No further development will occur on it.*
 
 The Semiologic Affiliate plugin will add your [Semiologic affiliate ID](http://www.semiologic.com/partners/) to links on your site that point to [semiologic.com](http://www.semiologic.com) or [getsemiologic.com](http://www.getsemiologic.com).
 
